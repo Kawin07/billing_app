@@ -49,13 +49,22 @@ class BillingApp(QWidget):
 
         layout.addLayout(button_layout)
 
+        # Additional Button Layout
+        additional_button_layout = QHBoxLayout()
+
         self.show_button = QPushButton('Show All Bills', self)
         self.show_button.clicked.connect(self.show_bills)
-        layout.addWidget(self.show_button)
+        additional_button_layout.addWidget(self.show_button)
+
+        self.delete_all_button = QPushButton('Delete All Bills', self)
+        self.delete_all_button.clicked.connect(self.delete_all_bills)
+        additional_button_layout.addWidget(self.delete_all_button)
 
         self.refresh_button = QPushButton('Refresh', self)
         self.refresh_button.clicked.connect(self.refresh_table)
-        layout.addWidget(self.refresh_button)
+        additional_button_layout.addWidget(self.refresh_button)
+
+        layout.addLayout(additional_button_layout)
 
         self.table = QTableWidget()
         layout.addWidget(self.table)
@@ -123,9 +132,16 @@ class BillingApp(QWidget):
     def show_bills(self):
         try:
             self.cursor.execute('''SELECT bills.id, customers.name, customers.contact, bills.bill_amount 
-                                   FROM bills 
-                                   JOIN customers ON bills.customer_id = customers.id''')
+                               FROM bills 
+                               JOIN customers ON bills.customer_id = customers.id''')
             rows = self.cursor.fetchall()
+
+            if not rows:
+                QMessageBox.information(self, 'No Bills', 'There are no bills to show.')
+                self.table.clear()  # Clear the table if there's no data
+                self.table.setRowCount(0)
+                self.table.setColumnCount(0)
+                return
 
             self.table.setRowCount(len(rows))
             self.table.setColumnCount(4)
@@ -136,6 +152,7 @@ class BillingApp(QWidget):
                     self.table.setItem(row_num, col_num, QTableWidgetItem(str(data)))
         except mysql.connector.Error as e:
             QMessageBox.critical(self, 'Database Error', str(e))
+
 
     def update_bill(self):
         try:
@@ -171,6 +188,28 @@ class BillingApp(QWidget):
             QMessageBox.information(self, 'Success', 'Bill deleted successfully!')
         except Exception as e:
             QMessageBox.critical(self, 'Delete Error', str(e))
+
+    def delete_all_bills(self):
+        try:
+            self.cursor.execute('SELECT COUNT(*) FROM bills')
+            bill_count = self.cursor.fetchone()[0]
+
+            if bill_count == 0:
+                QMessageBox.information(self, 'No Bills', 'There are no bills to delete.')
+                return
+
+            reply = QMessageBox.question(self, 'Delete All Bills', 
+                                     'Are you sure you want to delete all bills? This action cannot be undone.', 
+                                     QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+            if reply == QMessageBox.Yes:
+                self.cursor.execute('DELETE FROM bills')
+                self.cursor.execute('ALTER TABLE bills AUTO_INCREMENT = 1')  # Reset auto-increment
+                self.conn.commit()
+                QMessageBox.information(self, 'Success', 'All bills have been deleted!')
+                self.show_bills()
+        except Exception as e:
+            QMessageBox.critical(self, 'Delete Error', str(e))
+
 
 
 if __name__ == '__main__':
