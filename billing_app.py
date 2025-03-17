@@ -138,7 +138,7 @@ class BillingApp(QWidget):
 
             if not rows:
                 QMessageBox.information(self, 'No Bills', 'There are no bills to show.')
-                self.table.clear()  # Clear the table if there's no data
+                self.table.clear()
                 self.table.setRowCount(0)
                 self.table.setColumnCount(0)
                 return
@@ -182,12 +182,19 @@ class BillingApp(QWidget):
                 return
 
             bill_id = int(self.table.item(current_row, 0).text())
-
-            self.cursor.execute('DELETE FROM bills WHERE id = %s', (bill_id,))
-            self.conn.commit()
-            QMessageBox.information(self, 'Success', 'Bill deleted successfully!')
+        
+            reply = QMessageBox.question(self, 'Delete Bill', 
+                                     f'Are you sure you want to delete Bill ID {bill_id}?', 
+                                     QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+            if reply == QMessageBox.Yes:
+                self.cursor.execute('DELETE FROM bills WHERE id = %s', (bill_id,))
+                self.conn.commit()
+            
+                QMessageBox.information(self, 'Success', 'Bill deleted successfully!')
+                self.show_bills()
         except Exception as e:
             QMessageBox.critical(self, 'Delete Error', str(e))
+
 
     def delete_all_bills(self):
         try:
@@ -199,16 +206,32 @@ class BillingApp(QWidget):
                 return
 
             reply = QMessageBox.question(self, 'Delete All Bills', 
-                                     'Are you sure you want to delete all bills? This action cannot be undone.', 
+                                     'Are you sure you want to delete all bills and all customers? This action cannot be undone.', 
                                      QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
             if reply == QMessageBox.Yes:
+                # Delete all bills
                 self.cursor.execute('DELETE FROM bills')
-                self.cursor.execute('ALTER TABLE bills AUTO_INCREMENT = 1')  # Reset auto-increment
                 self.conn.commit()
-                QMessageBox.information(self, 'Success', 'All bills have been deleted!')
+            
+                # Reset the bills auto-increment
+                self.cursor.execute('ALTER TABLE bills AUTO_INCREMENT = 1')
+                self.conn.commit()
+            
+                # Delete all customers
+                self.cursor.execute('DELETE FROM customers')
+                self.conn.commit()
+            
+                # Reset the customers auto-increment
+                self.cursor.execute('ALTER TABLE customers AUTO_INCREMENT = 1')
+                self.conn.commit()
+            
+                QMessageBox.information(self, 'Success', 'All bills and customers have been deleted!')
                 self.show_bills()
         except Exception as e:
             QMessageBox.critical(self, 'Delete Error', str(e))
+
+
+
 
 
 
